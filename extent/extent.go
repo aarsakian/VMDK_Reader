@@ -6,7 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
+	"regexp"
 
 	"github.com/aarsakian/VMDK_Reader/utils"
 )
@@ -38,7 +38,7 @@ func ProcessExtents(imagePath string) Extents {
 
 	extentDescriptionLocated := false
 	diskDatabaseLocated := false
-
+	re := regexp.MustCompile(`([\w+]+)\s([\w+]+)\s([\w+]+).*"([A-Za-z\s\-0-9\.]+)`)
 	for idx, line := range lines {
 		if idx == 0 && !bytes.Equal(line, []byte("# Disk DescriptorFile")) {
 			fmt.Printf("Signature not found %s\n", line)
@@ -55,15 +55,20 @@ func ProcessExtents(imagePath string) Extents {
 		}
 
 		if extentDescriptionLocated {
-			cols := bytes.Split(line, []byte(" "))
-			if len(cols) < 4 {
-
+			matches := re.FindAllSubmatch(line, -1)
+			if len(matches) == 0 {
 				continue
 			}
-			extent_ := Extent{AccessMode: string(cols[0]),
-				NofSectors: utils.ReadEndianInt(cols[1]),
-				ExtentType: string(cols[2]),
-				Filename:   strings.ReplaceAll(string(cols[3]), "\"", "")}
+
+			cols := matches[0]
+			if len(cols) < 5 {
+				continue
+			}
+
+			extent_ := Extent{AccessMode: string(cols[1]),
+				NofSectors: utils.ReadEndianInt(cols[2]),
+				ExtentType: string(cols[3]),
+				Filename:   string(cols[4])}
 
 			extents = append(extents, extent_)
 
