@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/aarsakian/VMDK_Reader/logger"
 	"github.com/aarsakian/VMDK_Reader/utils"
 )
 
@@ -34,6 +35,7 @@ func ProcessExtents(imagePath string) Extents {
 
 	if err != nil {
 		fmt.Println("Error reading file:", err)
+		logger.VMDKlogger.Error(fmt.Sprintf("Error reading file: %e", err))
 	}
 	lines := bytes.Split(data, []byte("\n"))
 
@@ -43,6 +45,7 @@ func ProcessExtents(imagePath string) Extents {
 	for idx, line := range lines {
 		if idx == 0 && !bytes.Equal(line, []byte("# Disk DescriptorFile")) {
 			fmt.Printf("Signature not found %s\n", line)
+			logger.VMDKlogger.Warning(fmt.Sprintf("Signature not found %s", line))
 			os.Exit(0)
 
 		}
@@ -68,6 +71,7 @@ func ProcessExtents(imagePath string) Extents {
 			nofsectors, e := strconv.Atoi(string(cols[2]))
 			if e != nil {
 				fmt.Println(e)
+				logger.VMDKlogger.Error(fmt.Sprintf("%e", e))
 				continue
 			}
 			extent_ := Extent{AccessMode: string(cols[1]),
@@ -94,6 +98,7 @@ func (extent *Extent) CreateHandle(basepath string) {
 	file, err := os.Open(fullPath)
 	if err != nil {
 		fmt.Printf("Error opening file %s\n", fullPath)
+		logger.VMDKlogger.Error(fmt.Sprintf("Error opening file %s", fullPath))
 	}
 	extent.Fhandle = file
 }
@@ -114,7 +119,8 @@ func (extent Extent) LocateData(data *bytes.Buffer, offsetB int64, length int64)
 		remainingDataLen = length
 		for remainingDataLen > 0 {
 			grainOffset := int64(extent.GrainOffsets[startGrainId]) * 512
-			fmt.Printf("Reading from %d\n", grainOffset+startOffsetWithinGrain)
+			logger.VMDKlogger.Info(fmt.Sprintf("Reading from %d\n",
+				grainOffset+startOffsetWithinGrain))
 
 			if remainingDataLen < grainSizeB {
 				buf = make([]byte, remainingDataLen)
@@ -146,6 +152,8 @@ func (extent Extent) ReadAt(buf []byte, offset int64) {
 	_, err := extent.Fhandle.ReadAt(buf, offset)
 	if err != nil {
 		fmt.Printf("File %s Error reading at %s\n", extent.Filename, err)
+		logger.VMDKlogger.Error(fmt.Sprintf("File %s Error reading at %s\n",
+			extent.Filename, err))
 	}
 }
 
@@ -191,7 +199,7 @@ func (extents Extents) RetrieveData(basepath string, offsetB int64, length int64
 			offsetBByExtent = offsetB - extentEndSector*512
 			continue
 		}
-		fmt.Printf("Located extent %s\n", extent.Filename)
+		logger.VMDKlogger.Info(fmt.Sprintf("Located extent %s\n", extent.Filename))
 		extent.CreateHandle(basepath)
 		defer extent.CloseHandler()
 

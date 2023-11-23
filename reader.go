@@ -5,6 +5,7 @@ import (
 
 	"flag"
 	"fmt"
+
 	"github.com/aarsakian/VMDK_Reader/extent"
 	"github.com/aarsakian/VMDK_Reader/logger"
 )
