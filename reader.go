@@ -5,8 +5,8 @@ import (
 
 	"flag"
 	"fmt"
-
 	"github.com/aarsakian/VMDK_Reader/extent"
+	"github.com/aarsakian/VMDK_Reader/logger"
 )
 
 // Descriptor
@@ -26,6 +26,10 @@ func main() {
 	offset := flag.Int64("offset", -1, "offset to extract data")
 	lenght := flag.Int64("length", -1, "lenght of data")
 	size := flag.Bool("size", false, "size of virtual hard disk")
+	loggerActive := flag.Bool("log", false, "enable logging")
+
+	logger.InitializeLogger(*loggerActive)
+
 	flag.Parse()
 	var extents extent.Extents
 	if *imagePath != "" {
