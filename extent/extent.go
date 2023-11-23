@@ -166,8 +166,9 @@ func (extents Extents) GetHDSize() int64 {
 }
 
 func (extents Extents) Parse(basepath string) {
+	fmt.Printf("Parsing Extents\n")
 	for idx := range extents {
-		fmt.Printf("Parsing extent %s\n", extents[idx].Filename)
+		logger.VMDKlogger.Info(fmt.Sprintf("Parsing extent %s\n", extents[idx].Filename))
 		extents[idx].CreateHandle(basepath)
 		defer extents[idx].CloseHandler()
 		switch extents[idx].ExtentType {
