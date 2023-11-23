@@ -9,7 +9,7 @@ import (
 
 func ReadEndianInt(barray []byte) int64 {
 	var buf []byte
-	if barray[len(barray)-1]&0x80 != 0 {
+	if barray[len(barray)-1]&0x80 != 0 { //check for sign
 		buf = []byte{0xff, 0xff, 0xff, 0xff}
 	} else {
 		buf = []byte{0x00, 0x00, 0x00, 0x00}
