@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 
 	"github.com/aarsakian/VMDK_Reader/utils"
 )
@@ -64,9 +65,13 @@ func ProcessExtents(imagePath string) Extents {
 			if len(cols) < 5 {
 				continue
 			}
-
+			nofsectors, e := strconv.Atoi(string(cols[2]))
+			if e != nil {
+				fmt.Println(e)
+				continue
+			}
 			extent_ := Extent{AccessMode: string(cols[1]),
-				NofSectors: utils.ReadEndianInt(cols[2]),
+				NofSectors: int64(nofsectors),
 				ExtentType: string(cols[3]),
 				Filename:   string(cols[4])}
 
@@ -178,20 +183,22 @@ func (extents Extents) RetrieveData(basepath string, offsetB int64, length int64
 	dataBuf.Grow(int(length))
 
 	extentEndSector := int64(0)
+	offsetBByExtent := offsetB // in extent offset
 	//var buf bytes.Buffer
 	for _, extent := range extents {
 		extentEndSector += extent.NofSectors
-		if offsetB > extentEndSector { /// go to next extent
+		if offsetB > extentEndSector*512 { /// go to next extent
+			offsetBByExtent = offsetB - extentEndSector*512
 			continue
 		}
 		fmt.Printf("Located extent %s\n", extent.Filename)
 		extent.CreateHandle(basepath)
 		defer extent.CloseHandler()
 
-		length = extent.LocateData(&dataBuf, offsetB, length)
+		length = extent.LocateData(&dataBuf, offsetBByExtent, length)
 		// partially filled buffer continue to next extent
 
-		offsetB = extentEndSector * 512
+		//		offsetB = extentEndSector * 512 ?? need to check
 		if length <= 0 {
 			break
 		}
