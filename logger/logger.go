@@ -22,9 +22,9 @@ func InitializeLogger(active bool, logfilename string) {
 			log.Fatal(err)
 		}
 
-		info := log.New(file, "INFO: ", log.Ldate|log.Ltime)
-		warning := log.New(file, "WARNING: ", log.Ldate|log.Ltime)
-		error_ := log.New(file, "ERROR: ", log.Ldate|log.Ltime)
+		info := log.New(file, "VMDK_Reader|INFO: ", log.Ldate|log.Ltime)
+		warning := log.New(file, "VMDK_Reader|WARNING: ", log.Ldate|log.Ltime)
+		error_ := log.New(file, "VMDK_Reader|ERROR: ", log.Ldate|log.Ltime)
 		VMDKlogger = Logger{info: info, warning: warning, error_: error_, active: active}
 	} else {
 		VMDKlogger = Logger{active: active}
