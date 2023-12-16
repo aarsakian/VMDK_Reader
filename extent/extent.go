@@ -118,6 +118,9 @@ func (extent Extent) LocateData(data *bytes.Buffer, offsetB int64, length int64)
 		startOffsetWithinGrain := offsetB % (int64(extent.SparseHeader.GrainSize) * 512)
 		remainingDataLen = length
 		for remainingDataLen > 0 {
+			if startGrainId >= len(extent.GrainOffsets) {
+				return remainingDataLen
+			}
 			grainOffset := int64(extent.GrainOffsets[startGrainId]) * 512
 			logger.VMDKlogger.Info(fmt.Sprintf("Reading from %d\n",
 				grainOffset+startOffsetWithinGrain))
@@ -188,8 +191,7 @@ func (extents Extents) Parse(basepath string) {
 }
 
 func (extents Extents) RetrieveData(basepath string, offsetB int64, length int64) []byte {
-	dataBuf := bytes.Buffer{}
-	dataBuf.Grow(int(length))
+	dataBuf := bytes.NewBuffer(make([]byte, 0, length))
 
 	extentEndSector := int64(0)
 	offsetBByExtent := offsetB // in extent offset
@@ -204,7 +206,7 @@ func (extents Extents) RetrieveData(basepath string, offsetB int64, length int64
 		extent.CreateHandle(basepath)
 		defer extent.CloseHandler()
 
-		length = extent.LocateData(&dataBuf, offsetBByExtent, length)
+		length = extent.LocateData(dataBuf, offsetBByExtent, length)
 		// partially filled buffer continue to next extent
 
 		//		offsetB = extentEndSector * 512 ?? need to check
