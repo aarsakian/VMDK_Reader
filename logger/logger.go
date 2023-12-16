@@ -3,7 +3,6 @@ package logger
 import (
 	"log"
 	"os"
-	"time"
 )
 
 type Logger struct {
@@ -15,18 +14,17 @@ type Logger struct {
 
 var VMDKlogger Logger
 
-func InitializeLogger(active bool) {
+func InitializeLogger(active bool, logfilename string) {
 	if active {
-		now := time.Now()
-		logfilename := "logs" + now.Format("2006-01-02T15_04_05") + ".txt"
+
 		file, err := os.OpenFile(logfilename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		info := log.New(file, "INFO: ", log.Ldate|log.Ltime)
-		warning := log.New(file, "WARNING: ", log.Ldate|log.Ltime)
-		error_ := log.New(file, "ERROR: ", log.Ldate|log.Ltime)
+		info := log.New(file, "VMDK_Reader|INFO: ", log.Ldate|log.Ltime)
+		warning := log.New(file, "VMDK_Reader|WARNING: ", log.Ldate|log.Ltime)
+		error_ := log.New(file, "VMDK_Reader|ERROR: ", log.Ldate|log.Ltime)
 		VMDKlogger = Logger{info: info, warning: warning, error_: error_, active: active}
 	} else {
 		VMDKlogger = Logger{active: active}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"time"
 
 	"flag"
 	"fmt"
@@ -29,7 +30,9 @@ func main() {
 	size := flag.Bool("size", false, "size of virtual hard disk")
 	loggerActive := flag.Bool("log", false, "enable logging")
 
-	logger.InitializeLogger(*loggerActive)
+	now := time.Now()
+	logfilename := "logs" + now.Format("2006-01-02T15_04_05") + ".txt"
+	logger.InitializeLogger(*loggerActive, logfilename)
 
 	flag.Parse()
 	var extents extent.Extents

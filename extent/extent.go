@@ -122,7 +122,7 @@ func (extent Extent) LocateData(data *bytes.Buffer, offsetB int64, length int64)
 				return remainingDataLen
 			}
 			grainOffset := int64(extent.GrainOffsets[startGrainId]) * 512
-			logger.VMDKlogger.Info(fmt.Sprintf("Reading from %d\n",
+			logger.VMDKlogger.Info(fmt.Sprintf("Reading from %d.",
 				grainOffset+startOffsetWithinGrain))
 
 			if remainingDataLen < grainSizeB {
@@ -155,7 +155,7 @@ func (extent Extent) ReadAt(buf []byte, offset int64) {
 	_, err := extent.Fhandle.ReadAt(buf, offset)
 	if err != nil {
 		fmt.Printf("File %s Error reading at %s\n", extent.Filename, err)
-		logger.VMDKlogger.Error(fmt.Sprintf("File %s Error reading at %s\n",
+		logger.VMDKlogger.Error(fmt.Sprintf("File %s Error reading at %s.",
 			extent.Filename, err))
 	}
 }
@@ -171,7 +171,7 @@ func (extents Extents) GetHDSize() int64 {
 func (extents Extents) Parse(basepath string) {
 	fmt.Printf("Parsing Extents\n")
 	for idx := range extents {
-		logger.VMDKlogger.Info(fmt.Sprintf("Parsing extent %s\n", extents[idx].Filename))
+		logger.VMDKlogger.Info(fmt.Sprintf("Parsing extent %s.", extents[idx].Filename))
 		extents[idx].CreateHandle(basepath)
 		defer extents[idx].CloseHandler()
 		switch extents[idx].ExtentType {
@@ -202,7 +202,7 @@ func (extents Extents) RetrieveData(basepath string, offsetB int64, length int64
 			offsetBByExtent = offsetB - extentEndSector*512
 			continue
 		}
-		logger.VMDKlogger.Info(fmt.Sprintf("Located extent %s\n", extent.Filename))
+		logger.VMDKlogger.Info(fmt.Sprintf("Located extent %s", extent.Filename))
 		extent.CreateHandle(basepath)
 		defer extent.CloseHandler()
 
