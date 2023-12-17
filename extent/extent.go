@@ -214,6 +214,9 @@ func (extents Extents) RetrieveData(basepath string, offsetB int64, length int64
 			break
 		}
 
+		//if we reached this point next extent should start from 0
+		offsetBByExtent = 0
+
 	}
 	return dataBuf.Bytes()
 }
