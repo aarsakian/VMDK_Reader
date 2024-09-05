@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"strconv"
 
@@ -28,7 +27,7 @@ type Extent struct {
 	GrainOffsets     GrainOffsets
 }
 
-func ProcessExtents(imagePath string) Extents {
+func LocateExtents(imagePath string) Extents {
 	var extents Extents
 
 	data, err := os.ReadFile(imagePath)
@@ -40,21 +39,16 @@ func ProcessExtents(imagePath string) Extents {
 	lines := bytes.Split(data, []byte("\n"))
 
 	extentDescriptionLocated := false
-	diskDatabaseLocated := false
-	re := regexp.MustCompile(`([\w+]+)\s([\w+]+)\s([\w+]+).*"([A-Za-z\s\-0-9\.]+)`)
-	for idx, line := range lines {
-		if idx == 0 && !bytes.Equal(line, []byte("# Disk DescriptorFile")) {
-			fmt.Printf("Signature not found %s\n", line)
-			logger.VMDKlogger.Warning(fmt.Sprintf("Signature not found %s", line))
-			os.Exit(0)
 
-		}
+	re := regexp.MustCompile(`([\w+]+)\s([\w+]+)\s([\w+]+).*"([A-Za-z\s\-0-9\.]+)`)
+	for _, line := range lines {
+
 		if bytes.Equal(line, []byte("# Extent description")) {
 			extentDescriptionLocated = true
 			continue
 		} else if bytes.Equal(line, []byte("# The Disk Data Base ")) {
 			extentDescriptionLocated = false
-			diskDatabaseLocated = true
+
 			continue
 		}
 
@@ -83,13 +77,7 @@ func ProcessExtents(imagePath string) Extents {
 
 		}
 
-		if diskDatabaseLocated {
-
-		}
-
 	}
-
-	extents.Parse(filepath.Dir(imagePath))
 	return extents
 }
 
@@ -181,8 +169,8 @@ func (extents Extents) Parse(basepath string) {
 			extents[idx].ReadAt(buf, 0)
 			utils.Unmarshal(buf, sparseH)
 			extents[idx].SparseHeader = sparseH
-			buf = make([]byte, sparseH.OverHead*512)
-			extents[idx].ReadAt(buf, int64(sparseH.GdOffset)*512)
+			buf = make([]byte, sparseH.OverHead*512)              //size equal to size of metadata
+			extents[idx].ReadAt(buf, int64(sparseH.GdOffset)*512) //read metadata
 
 			extents[idx].GrainOffsets = sparseH.PopulateGrainOffsets(buf)
 		}
@@ -213,6 +201,9 @@ func (extents Extents) RetrieveData(basepath string, offsetB int64, length int64
 		if length <= 0 {
 			break
 		}
+
+		//if we reached this point next extent should start from 0
+		offsetBByExtent = 0
 
 	}
 	return dataBuf.Bytes()
