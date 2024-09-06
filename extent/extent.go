@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 
@@ -18,7 +18,7 @@ type Extent struct {
 	AccessMode       string
 	NofSectors       int64
 	ExtentType       string
-	Filename         string
+	FilenamePath     string
 	StartSector      int32 //only for flat extents
 	PartitionUUID    int64
 	DeviceIdentifier int
@@ -33,8 +33,8 @@ func LocateExtents(imagePath string) Extents {
 	data, err := os.ReadFile(imagePath)
 
 	if err != nil {
-		fmt.Println("Error reading file:", err)
-		logger.VMDKlogger.Error(fmt.Sprintf("Error reading file: %e", err))
+		fmt.Println("Error reading extent file:", err)
+		logger.VMDKlogger.Error(fmt.Sprintf("Error reading extent file: %e", err))
 	}
 	lines := bytes.Split(data, []byte("\n"))
 
@@ -69,9 +69,9 @@ func LocateExtents(imagePath string) Extents {
 				continue
 			}
 			extent_ := Extent{AccessMode: string(cols[1]),
-				NofSectors: int64(nofsectors),
-				ExtentType: string(cols[3]),
-				Filename:   string(cols[4])}
+				NofSectors:   int64(nofsectors),
+				ExtentType:   string(cols[3]),
+				FilenamePath: filepath.Join(filepath.Dir(imagePath), string(cols[4]))}
 
 			extents = append(extents, extent_)
 
@@ -81,12 +81,12 @@ func LocateExtents(imagePath string) Extents {
 	return extents
 }
 
-func (extent *Extent) CreateHandle(basepath string) {
-	fullPath := path.Join(basepath, extent.Filename)
-	file, err := os.Open(fullPath)
+func (extent *Extent) CreateHandle() {
+
+	file, err := os.Open(extent.FilenamePath)
 	if err != nil {
-		fmt.Printf("Error opening file %s\n", fullPath)
-		logger.VMDKlogger.Error(fmt.Sprintf("Error opening file %s", fullPath))
+		fmt.Printf("Error opening file %s\n", extent.FilenamePath)
+		logger.VMDKlogger.Error(fmt.Sprintf("Error opening file %s", extent.FilenamePath))
 	}
 	extent.Fhandle = file
 }
@@ -95,8 +95,9 @@ func (extent Extent) CloseHandler() {
 	extent.Fhandle.Close()
 }
 
-func (extent Extent) LocateData(data *bytes.Buffer, offsetB int64, length int64) int64 {
+func (extent Extent) LocateData(offsetB int64, length int64) (int64, []byte, []int64) {
 	var remainingDataLen int64
+	var grainOffsets []int64 // track offsets
 	var buf []byte
 	switch extent.ExtentType {
 	case "SPARSE":
@@ -107,9 +108,10 @@ func (extent Extent) LocateData(data *bytes.Buffer, offsetB int64, length int64)
 		remainingDataLen = length
 		for remainingDataLen > 0 {
 			if startGrainId >= len(extent.GrainOffsets) {
-				return remainingDataLen
+				return remainingDataLen, buf, grainOffsets
 			}
 			grainOffset := int64(extent.GrainOffsets[startGrainId]) * 512
+			grainOffsets = append(grainOffsets, grainOffset)
 			logger.VMDKlogger.Info(fmt.Sprintf("Reading from %d.",
 				grainOffset+startOffsetWithinGrain))
 
@@ -125,27 +127,29 @@ func (extent Extent) LocateData(data *bytes.Buffer, offsetB int64, length int64)
 			if grainOffset != 0 {
 
 				extent.ReadAt(buf, grainOffset+startOffsetWithinGrain)
+
 			}
-
-			data.Write(buf)
 			remainingDataLen -= int64(len(buf))
-
 			startGrainId += 1
 			startOffsetWithinGrain = 0 // next grain is always from beginning
 		}
 
 	}
-	return remainingDataLen
+	return remainingDataLen, buf, grainOffsets
 
 }
 
 func (extent Extent) ReadAt(buf []byte, offset int64) {
 	_, err := extent.Fhandle.ReadAt(buf, offset)
 	if err != nil {
-		fmt.Printf("File %s Error reading at %s\n", extent.Filename, err)
+		fmt.Printf("File %s Error reading at %s\n", extent.FilenamePath, err)
 		logger.VMDKlogger.Error(fmt.Sprintf("File %s Error reading at %s.",
-			extent.Filename, err))
+			extent.FilenamePath, err))
 	}
+}
+
+func (extent Extent) GetGrainSizeB() int64 {
+	return int64(extent.SparseHeader.GrainSize) * 512
 }
 
 func (extents Extents) GetHDSize() int64 {
@@ -156,11 +160,11 @@ func (extents Extents) GetHDSize() int64 {
 	return int64(totalSize) * 512
 }
 
-func (extents Extents) Parse(basepath string) {
+func (extents Extents) Parse() {
 	fmt.Printf("Parsing Extents\n")
 	for idx := range extents {
-		logger.VMDKlogger.Info(fmt.Sprintf("Parsing extent %s.", extents[idx].Filename))
-		extents[idx].CreateHandle(basepath)
+		logger.VMDKlogger.Info(fmt.Sprintf("Parsing extent %s.", extents[idx].FilenamePath))
+		extents[idx].CreateHandle()
 		defer extents[idx].CloseHandler()
 		switch extents[idx].ExtentType {
 		case "SPARSE":
@@ -178,26 +182,29 @@ func (extents Extents) Parse(basepath string) {
 
 }
 
-func (extents Extents) RetrieveData(basepath string, offsetB int64, length int64) []byte {
-	dataBuf := bytes.NewBuffer(make([]byte, 0, length))
+func (extents Extents) RetrieveData(dataBuf *bytes.Buffer, offsetB int64, length int64) []int64 {
 
 	extentEndSector := int64(0)
 	offsetBByExtent := offsetB // in extent offset
 	//var buf bytes.Buffer
+
+	var extentsGrainOffsets []int64
 	for _, extent := range extents {
 		extentEndSector += extent.NofSectors
 		if offsetB > extentEndSector*512 { /// go to next extent
 			offsetBByExtent = offsetB - extentEndSector*512
 			continue
 		}
-		logger.VMDKlogger.Info(fmt.Sprintf("Located extent %s", extent.Filename))
-		extent.CreateHandle(basepath)
+		logger.VMDKlogger.Info(fmt.Sprintf("Located extent %s", extent.FilenamePath))
+		extent.CreateHandle()
 		defer extent.CloseHandler()
 
-		length = extent.LocateData(dataBuf, offsetBByExtent, length)
+		length, extentDataBuf, grainOffsets := extent.LocateData(offsetBByExtent, length)
 		// partially filled buffer continue to next extent
 
 		//		offsetB = extentEndSector * 512 ?? need to check
+		extentsGrainOffsets = append(extentsGrainOffsets, grainOffsets...)
+		dataBuf.Write(extentDataBuf)
 		if length <= 0 {
 			break
 		}
@@ -206,5 +213,5 @@ func (extents Extents) RetrieveData(basepath string, offsetB int64, length int64
 		offsetBByExtent = 0
 
 	}
-	return dataBuf.Bytes()
+	return extentsGrainOffsets
 }
