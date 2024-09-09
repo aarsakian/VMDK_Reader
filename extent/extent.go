@@ -95,7 +95,7 @@ func (extent Extent) CloseHandler() {
 	extent.Fhandle.Close()
 }
 
-func (extent Extent) LocateData(offsetB int64, length int64) (int64, []byte, []int64) {
+func (extent Extent) LocateData(requestedBuf *bytes.Buffer, offsetB int64, length int64) (int64, []int64) {
 	var remainingDataLen int64
 	var grainOffsets []int64 // track offsets
 	var buf []byte
@@ -108,7 +108,7 @@ func (extent Extent) LocateData(offsetB int64, length int64) (int64, []byte, []i
 		remainingDataLen = length
 		for remainingDataLen > 0 {
 			if startGrainId >= len(extent.GrainOffsets) {
-				return remainingDataLen, buf, grainOffsets
+				return remainingDataLen, grainOffsets
 			}
 			grainOffset := int64(extent.GrainOffsets[startGrainId]) * 512
 			grainOffsets = append(grainOffsets, grainOffset)
@@ -127,7 +127,7 @@ func (extent Extent) LocateData(offsetB int64, length int64) (int64, []byte, []i
 			if grainOffset != 0 {
 
 				extent.ReadAt(buf, grainOffset+startOffsetWithinGrain)
-
+				requestedBuf.Write(buf)
 			}
 			remainingDataLen -= int64(len(buf))
 			startGrainId += 1
@@ -135,7 +135,7 @@ func (extent Extent) LocateData(offsetB int64, length int64) (int64, []byte, []i
 		}
 
 	}
-	return remainingDataLen, buf, grainOffsets
+	return remainingDataLen, grainOffsets
 
 }
 
@@ -199,12 +199,12 @@ func (extents Extents) RetrieveData(dataBuf *bytes.Buffer, offsetB int64, length
 		extent.CreateHandle()
 		defer extent.CloseHandler()
 
-		length, extentDataBuf, grainOffsets := extent.LocateData(offsetBByExtent, length)
+		length, grainOffsets := extent.LocateData(dataBuf, offsetBByExtent, length)
 		// partially filled buffer continue to next extent
 
 		//		offsetB = extentEndSector * 512 ?? need to check
 		extentsGrainOffsets = append(extentsGrainOffsets, grainOffsets...)
-		dataBuf.Write(extentDataBuf)
+
 		if length <= 0 {
 			break
 		}
