@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/aarsakian/VMDK_Reader/logger"
+	"github.com/aarsakian/VMDK_Reader/vmdk"
 )
 
 func main() {
@@ -22,7 +23,7 @@ func main() {
 
 	flag.Parse()
 
-	vmdkImage := VMDKImage{path: *imagePath}
+	vmdkImage := vmdk.VMDKImage{Path: *imagePath}
 
 	if *imagePath != "" {
 		vmdkImage.Process()
@@ -35,7 +36,7 @@ func main() {
 			logger.VMDKlogger.Error(err)
 		} else {
 			parentVMDKImage.Process()
-			vmdkImage.parentImage = &parentVMDKImage
+			vmdkImage.ParentImage = &parentVMDKImage
 		}
 	}
 
