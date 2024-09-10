@@ -102,8 +102,8 @@ func (vmdkImage VMDKImage) RetrieveData(offset int64, length int64) []byte {
 				continue
 			}
 
-			offsetGrain *= int64(idx)
-			vmdkImage.ParentImage.Extents.RetrieveData(&dataParentBuf, offset-offsetGrain, length-offsetGrain) //retrieve only data for zeroed grain offsetss
+			offsetGrain = int64(idx) * grainSize
+			vmdkImage.ParentImage.Extents.RetrieveData(&dataParentBuf, offset+offsetGrain, grainSize) //retrieve only data for zeroed grain offsetss
 
 		}
 		return dataParentBuf.Bytes()
